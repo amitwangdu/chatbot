@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF Search Engine</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+    <div class="container mx-auto px-4 py-8">
+        <h1 class="text-3xl font-bold mb-8">PDF Search Engine</h1>
+        
+        <!-- Upload Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <h2 class="text-xl font-semibold mb-4">Upload PDFs</h2>
+            <form id="uploadForm" class="mb-4">
+                <input type="file" name="file" multiple accept=".pdf" 
+                       class="block w-full text-sm text-gray-500 mb-4
+                              file:mr-4 file:py-2 file:px-4
+                              file:rounded-full file:border-0
+                              file:text-sm file:font-semibold
+                              file:bg-blue-50 file:text-blue-700
+                              hover:file:bg-blue-100">
+                <button type="submit" 
+                        class="bg-blue-500 text-white px-4 py-2 rounded-md
+                               hover:bg-blue-600 transition-colors">
+                    Upload Files
+                </button>
+            </form>
+            <div id="uploadStatus" class="text-sm text-gray-600"></div>
+        </div>
+        
+        <!-- Search Section -->
+        <div class="bg-white p-6 rounded-lg shadow-md">
+            <h2 class="text-xl font-semibold mb-4">Search Documents</h2>
+            <div class="mb-4">
+                <input type="text" id="searchInput" 
+                       placeholder="Enter your search query..." 
+                       class="w-full p-2 border rounded-md">
+            </div>
+            <button onclick="performSearch()" 
+                    class="bg-green-500 text-white px-4 py-2 rounded-md
+                           hover:bg-green-600 transition-colors">
+                Search
+            </button>
+            
+            <!-- Results Section -->
+            <div id="searchResults" class="mt-6 space-y-4"></div>
+        </div>
+    </div>
+
+    <script>
+        // Handle file uploads
+        document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData();
+            const files = e.target.file.files;
+            
+            for (let file of files) {
+                formData.append('file', file);
+            }
+            
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.innerHTML = 'Uploading...';
+            
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                let statusHTML = '<ul class="list-disc pl-5">';
+                data.files.forEach(file => {
+                    statusHTML += `<li class="${file.status === 'success' ? 'text-green-600' : 'text-red-600'}">
+                        ${file.filename}: ${file.status === 'success' ? 
+                        `Processed ${file.chunks} chunks` : 
+                        `Error: ${file.error}`}
+                    </li>`;
+                });
+                statusHTML += '</ul>';
+                
+                statusDiv.innerHTML = statusHTML;
+            } catch (error) {
+                statusDiv.innerHTML = `Error: ${error.message}`;
+            }
+        });
+
+        // Handle search
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            const resultsDiv = document.getElementById('searchResults');
+            
+            if (!query) {
+                resultsDiv.innerHTML = '<p class="text-red-500">Please enter a search query</p>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<p class="text-gray-600">Searching...</p>';
+            
+            try {
+                const response = await fetch('/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    resultsDiv.innerHTML = `<p class="text-red-500">Error: ${data.error}</p>`;
+                    return;
+                }
+                
+                if (data.results.length === 0) {
+                    resultsDiv.innerHTML = '<p class="text-gray-600">No results found</p>';
+                    return;
+                }
+                
+                let resultsHTML = '';
+                data.results.forEach(result => {
+                    resultsHTML += `
+                        <div class="border-b pb-4">
+                            <p class="text-sm text-gray-500">Source: ${result.source}</p>
+                            <p class="mt-2">${result.document}</p>
+                            <p class="text-sm text-gray-500 mt-1">Relevance Rank: ${result.relevance_rank}</p>
+                        </div>
+                    `;
+                });
+                
+                resultsDiv.innerHTML = resultsHTML;
+            } catch (error) {
+                resultsDiv.innerHTML = `<p class="text-red-500">Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>
